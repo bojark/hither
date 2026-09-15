@@ -35,11 +35,11 @@ The first playable version is intended to provide a small, complete exploration 
 - create a world with a specified number of non-edge hexes and generate its boundary as its shape emerges;
 - move between hexes, scout neighbouring locations and interact with the current location;
 - advance world time, accumulate fatigue and recover through rest;
-- use a small set of hex types, including Clearing, Forest, Wasteland and Cliff;
+- use a small set of hex types, including Clearing, Forest, Wasteland, Hill and Cliff;
 - encounter a Base Camp and a Watch Hill;
 - display a simple map and the information the player has discovered, with initial text descriptions.
 
-The [world-generation rules](docs/worldgeneration.md) also define Hill as a hex type. NPC simulation, seasons, weather, richer events, inventory and character progression belong to later stages.
+NPC simulation, seasons, weather, richer events, inventory and character progression belong to later stages.
 
 ---
 
