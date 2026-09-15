@@ -4,83 +4,68 @@
 
 **Made by Ivan "komurka" Kostin**
 
-The project focuses on creating a living world where exploration emerges from simulation rather than scripted events.
+The player explores a finite, unfamiliar world one hex at a time. Its shape and many of its places are determined during play, as exploration, prior discoveries, world rules and chance interact. Once a place has been generated, it remains part of that world's history.
 
 > Every playthrough tells the story of a world that did not exist before you entered it.
+
+> **Status:** Early prototype development
 >
-> Every journey takes place in a newly generated world. The player explores an unknown land one location at a time, making decisions, facing dangers, meeting people and uncovering places that have never existed before.
-
-> **Status:** Early development
-
----
-
-## Philosophy
-
-The game follows a simulation-first approach.
-
-Godot is primarily used as an engine for rendering, input and UI, while the game logic is implemented independently from scene nodes whenever possible.
-
-Core principles:
-
-- simulation over scripting;
-- deterministic world generation;
-- emergent gameplay;
-- modular architecture;
-- code that can be tested independently from the engine.
+> **Current version:** 0.02p
+>
+> **Target milestone:** 0.1p
 
 ---
 
-## Current Features
+## Design principles
 
-- World class
-- Project architecture
-- Design documentation
+- Simulation and world state drive play rather than a fixed sequence of events.
+- Generation happens when a mechanic requests a new hex; the full map is not generated in advance.
+- Generated locations and established world objects remain spatially consistent.
+- What exists in the world, what the player knows and what the interface shows are distinct.
+- World logic should remain independent of Godot scene nodes where practical.
 
-The gameplay systems are currently under active development.
-
----
-
-## Planned Systems
-
-- Procedural world generation
-- Regions
-- Cells
-- Features
-- Interactive objects
-- NPC simulation
-- Time and seasons
-- Weather
-- Events
-- Exploration
-- Perils
-- Inventory
-- Character progression
+Prototype 0.02p uses a world seed to reproduce terrain and sector contents at a given coordinate. Later generators may also account for exploration order, prior discoveries and changing world state, so the seed will remain one input rather than a complete predefined map.
 
 ---
 
-## Project Structure
+## Prototype 0.1p
 
-```text
-docs/
-    architecture.md
+The first playable version is intended to provide a small, complete exploration loop:
 
-scripts/
-    core/
-        game.gd
-        world.gd
-```
+- create a world with a specified number of non-edge hexes and generate its boundary as its shape emerges;
+- move between hexes, scout neighbouring locations and interact with the current location;
+- advance world time, accumulate fatigue and recover through rest;
+- use a small set of hex types, including Clearing, Forest, Wasteland and Cliff;
+- encounter a Base Camp and a Watch Hill;
+- display a simple map and the information the player has discovered, with initial text descriptions.
+
+The [world-generation rules](docs/worldgeneration.md) also define Hill as a hex type. NPC simulation, seasons, weather, richer events, inventory and character progression belong to later stages.
 
 ---
 
-## Documentation
+## Current state
 
-Project documentation is located in the `docs` directory.
+Prototype 0.02p implements the simulation foundation for a starting area:
 
-Currently available:
+- `World`, `Tile`, `HexCoord`, `Sector` and the base `Feature` hierarchy are independent of scene presentation;
+- each hex contains six directional sectors and one central sector, with at most one Feature in each sector;
+- the starting Clearing and its six neighbours are generated from a world seed and retained by coordinate;
+- the central sector of the starting hex always contains the unique Base Camp;
+- the central sector of one neighbouring hex always contains the unique Watch Hill;
+- outer sectors may contain a passive marsh, a gnat-swarm Encounter or a non-unique Nice Spot;
+- the test run accepts `--seed=<number>`, uses `12345` when no valid value is provided, prints the generated area and then exits.
 
-- `architecture.md`
+Movement, player knowledge and the playable exploration loop remain targets for later prototype versions. Version 0.03p is reserved for visualizing the generated starting area in Godot.
 
-Additional documents will describe world generation, events, combat, characters and other systems.
+---
+
+## Architecture
+
+Godot handles input, UI, map and scene rendering. The simulation holds the world, its rules and the player's knowledge. The interface and future visual scene of the current hex should reveal only information available to the player. Visuals can be built independently on top of the simulation.
+
+Each hex has six directional sectors numbered 0–5 clockwise from north, plus a central sector numbered 6. Features occupy sectors and may be passive properties, encounters requiring a decision, or optional places of interest.
+
+See [architecture](docs/architecture.md) for the wider model and [world generation](docs/worldgeneration.md) for prototype rules.
 
 ---
 
@@ -88,14 +73,6 @@ Additional documents will describe world generation, events, combat, characters 
 
 - Godot 4.7
 - GDScript
-
----
-
-## Development Status
-
-Hither is currently in the architecture phase.
-
-The primary goal at this stage is to design robust and extensible gameplay systems before implementing game mechanics and content.
 
 ---
 

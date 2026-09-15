@@ -1,4 +1,21 @@
-# World Generation (v0.1)
+# World Generation
+
+**Target milestone:** 0.1p
+
+## Implemented in 0.02p
+
+Version 0.02p provides a deliberately small, reproducible generator for testing the world model.
+
+- A run accepts a user argument in the form `--seed=<number>` and falls back to seed `12345` when it is absent, empty or invalid.
+- The starting area consists of the starting hex and its six neighbours.
+- Generated hexes are stored by axial coordinate and are returned unchanged when requested again.
+- The starting hex is always a Clearing at `(0, 0)`.
+- Other generated hexes are currently either Forest or Clearing.
+- The Base Camp is unique and occupies central sector 6 of the starting hex.
+- The Watch Hill is unique and occupies central sector 6 of one neighbouring hex selected reproducibly from the world seed.
+- Each outer sector independently has a 70% chance to remain empty, a 10% chance to contain a marsh Feature, a 10% chance to contain a gnat-swarm Encounter and a 10% chance to contain a non-unique Nice Spot.
+
+These probabilities and the two available terrain types are test rules for 0.02p. The pool, boundary and contextual generation rules below describe the target for prototype 0.1p.
 
 ## Overview
 
@@ -7,7 +24,7 @@ The world is generated lazily.
 A hex is generated only when it is first requested by a game mechanic
 (player movement, observation object, etc.).
 
-Once generated, a hex never changes its type during version 0.1.
+Once generated, a hex never changes its type during prototype 0.1p.
 
 The world is finite.
 
@@ -91,6 +108,14 @@ Generation and visibility are different concepts.
 
 ---
 
+# Sectors and Features
+
+Each hex has six outer sectors, numbered clockwise from the north: 0 north, 1 northeast, 2 southeast, 3 south, 4 southwest, and 5 northwest. Sector 6 is the centre, reserved for special features. Each sector contains at most one Feature. These local sector numbers are distinct from the hex's world coordinates.
+
+A Feature occupies one sector and may remain undiscovered after its hex has been revealed. Features include passive properties, Encounters that require a decision and usually disappear when resolved, and Places of Interest that offer optional interaction and usually persist. A Feature may also cause another Feature to appear. In early prototypes, a Place is a single interaction point; some Places may have explorable interiors in later versions.
+
+---
+
 # Hex Types
 
 ## Clearing (Опушка)
@@ -108,7 +133,7 @@ Generation rules
 Special rules
 
 - The starting hex is always a Clearing.
-- The starting Clearing always contains the unique object
+- The starting Clearing always contains the unique Place of Interest
   Base Camp.
 
 ---
@@ -147,7 +172,7 @@ Generation rules
 
 Special rules
 
-- Never contains a Watch Hill object.
+- Never contains a Watch Hill Place of Interest.
 - Visiting a Hill immediately reveals all six adjacent
   hexes except Hidden hexes.
 
@@ -167,7 +192,7 @@ Generation rules
 
 Special rules
 
-- May contain a Watch Hill object.
+- May contain a Watch Hill Place of Interest.
 
 ---
 
@@ -188,23 +213,25 @@ Generation rules
 Special rules
 
 - At least one side of every Cliff borders the Outside World.
-- Never contains a Watch Hill object.
+- Never contains a Watch Hill Place of Interest.
 
 ---
 
-# Objects
+# Places of Interest
 
 ## Base Camp
 
 Unique.
 
-Always generated on the starting Clearing.
+Always generated in central sector 6 of the starting Clearing.
 
 ---
 
 ## Watch Hill
 
-Rare exploration object.
+Unique exploration object.
+
+In 0.02p it is always generated in central sector 6 of one of the six hexes neighbouring the starting Clearing. The selected neighbour is determined reproducibly by the world seed.
 
 When used
 
@@ -214,3 +241,11 @@ When used
 - does not reveal Hidden hexes;
 - visibility is blocked by High hexes located between
   the Watch Hill and target hexes.
+
+The interaction effects above are targets for prototype 0.1p and are not implemented in 0.02p.
+
+---
+
+## Nice Spot
+
+Non-unique Place used by the 0.02p generator as an example of optional sector content. It may appear in any outer sector and may occur more than once in a world.
