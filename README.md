@@ -96,7 +96,7 @@ The current presentation hierarchy separates responsibilities:
 - `FeatureView` displays one feature;
 - `FeatureVisual` stores replaceable presentation settings for a feature type.
 
-See [architecture](docs/architecture.md) for the wider model, [code reference](docs/code-reference.md) for the implemented API, and [world-generation notes](docs/worldgeneration.md) for earlier generation design notes.
+See the [architecture](docs/architecture.md) for the wider model, the [code reference](docs/code-reference.md) for the implemented API, the [development chronicle](docs/chronicles.md) for version history and current goals, and the [world-generation notes](docs/worldgeneration.md) for earlier generation design notes.
 
 ---
 
