@@ -1,0 +1,55 @@
+[gd_scene format=3 uid="uid://4hnx5qqoxhlx"]
+
+[ext_resource type="Script" uid="uid://bua0tnybln7gw" path="res://scripts/presentation/world/hex_view.gd" id="1_21jur"]
+[ext_resource type="Material" uid="uid://40usc6p10hk5" path="res://assets/materials/terrain/hex_body_material.tres" id="1_t8kod"]
+[ext_resource type="Material" uid="uid://btdq2poycey4c" path="res://assets/materials/terrain/clearing_surface_material.tres" id="2_21jur"]
+
+[sub_resource type="CylinderMesh" id="CylinderMesh_icxt3"]
+top_radius = 1.0
+bottom_radius = 1.0
+height = 0.6
+radial_segments = 6
+rings = 1
+
+[sub_resource type="CylinderMesh" id="CylinderMesh_1ajab"]
+top_radius = 1.0
+bottom_radius = 1.0
+height = 0.06
+radial_segments = 6
+rings = 1
+
+[node name="HexView" type="Node3D" unique_id=932917803]
+script = ExtResource("1_21jur")
+
+[node name="Body" type="MeshInstance3D" parent="." unique_id=386509633]
+transform = Transform3D(0.8660254, 0, 0.5, 0, 1, 0, -0.5, 0, 0.8660254, 0, 0, 0)
+mesh = SubResource("CylinderMesh_icxt3")
+surface_material_override/0 = ExtResource("1_t8kod")
+
+[node name="Surface" type="MeshInstance3D" parent="." unique_id=1543010833]
+transform = Transform3D(0.8660254, 0, 0.5, 0, 1, 0, -0.5, 0, 0.8660254, 0, 0.33, 0)
+mesh = SubResource("CylinderMesh_1ajab")
+surface_material_override/0 = ExtResource("2_21jur")
+
+[node name="SectorAnchors" type="Node3D" parent="." unique_id=1194443288]
+
+[node name="Sector0" type="Marker3D" parent="SectorAnchors" unique_id=2085574496]
+transform = Transform3D(1, 0, 0, 0, 1, 0, 0, 0, 1, 0, 0.37, -0.55)
+
+[node name="Sector1" type="Marker3D" parent="SectorAnchors" unique_id=1321902390]
+transform = Transform3D(1, 0, 0, 0, 1, 0, 0, 0, 1, 0.476, 0.37, -0.275)
+
+[node name="Sector2" type="Marker3D" parent="SectorAnchors" unique_id=333872767]
+transform = Transform3D(1, 0, 0, 0, 1, 0, 0, 0, 1, 0.476, 0.37, 0.275)
+
+[node name="Sector3" type="Marker3D" parent="SectorAnchors" unique_id=766377638]
+transform = Transform3D(1, 0, 0, 0, 1, 0, 0, 0, 1, 0, 0.37, 0.55)
+
+[node name="Sector4" type="Marker3D" parent="SectorAnchors" unique_id=1138833991]
+transform = Transform3D(1, 0, 0, 0, 1, 0, 0, 0, 1, -0.476, 0.37, 0.275)
+
+[node name="Sector5" type="Marker3D" parent="SectorAnchors" unique_id=252729423]
+transform = Transform3D(1, 0, 0, 0, 1, 0, 0, 0, 1, -0.476, 0.37, -0.275)
+
+[node name="Sector6" type="Marker3D" parent="SectorAnchors" unique_id=1326874973]
+transform = Transform3D(1, 0, 0, 0, 1, 0, 0, 0, 1, 0, 0.37, 0)

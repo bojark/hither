@@ -1,0 +1,13 @@
+[gd_scene format=3 uid="uid://c88abkgurtr17"]
+
+[ext_resource type="Texture2D" uid="uid://cqqvs83113lhg" path="res://assets/textures/feature_placeholder.svg" id="1_gfrv5"]
+[ext_resource type="Script" uid="uid://fvj58ywdir6v" path="res://scripts/presentation/world/feature_view.gd" id="1_yd06t"]
+
+[node name="FeatureView" type="Node3D" unique_id=56969735]
+script = ExtResource("1_yd06t")
+
+[node name="Icon" type="Sprite3D" parent="." unique_id=799867759]
+transform = Transform3D(1, 0, 0, 0, 1, 0, 0, 0, 1, 0, 0.25, 0)
+pixel_size = 0.004
+billboard = 1
+texture = ExtResource("1_gfrv5")

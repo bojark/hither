@@ -1,8 +1,11 @@
 [gd_scene format=3 uid="uid://dmn4bubjg8fx0"]
 
 [ext_resource type="Script" uid="uid://6jbjkkllm4ju" path="res://scripts/core/game.gd" id="1_r150o"]
+[ext_resource type="PackedScene" uid="uid://cjd3s65og8qi8" path="res://scenes/world/world_view.tscn" id="2_rvslj"]
 
 [node name="Main" type="Node2D" unique_id=587542310]
 
 [node name="Game" type="Node" parent="." unique_id=1270852522]
 script = ExtResource("1_r150o")
+
+[node name="WorldView" parent="Game" unique_id=128235632 instance=ExtResource("2_rvslj")]

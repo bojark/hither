@@ -1,0 +1,10 @@
+[gd_resource type="Resource" script_class="FeatureVisual" format=3 uid="uid://c2jvab4ig4x1x"]
+
+[ext_resource type="Script" uid="uid://bd0xlgfhaoyhf" path="res://scripts/presentation/world/feature_visual.gd" id="1_gxrat"]
+[ext_resource type="Texture2D" uid="uid://cqqvs83113lhg" path="res://assets/textures/feature_placeholder.svg" id="2_2lrbf"]
+
+[resource]
+script = ExtResource("1_gxrat")
+texture = ExtResource("2_2lrbf")
+tint = Color(0.5097716, 0.29709455, 0.7507753, 1)
+metadata/_custom_type_script = "uid://bd0xlgfhaoyhf"
