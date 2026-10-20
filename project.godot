@@ -11,7 +11,7 @@ config_version=5
 [application]
 
 config/name="Hither"
-config/version="0.021p"
+config/version="0.022p"
 run/main_scene="uid://dmn4bubjg8fx0"
 config/features=PackedStringArray("4.7", "Forward Plus")
 config/icon="res://icon.svg"

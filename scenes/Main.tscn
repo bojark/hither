@@ -2,6 +2,87 @@
 
 [ext_resource type="Script" uid="uid://6jbjkkllm4ju" path="res://scripts/core/game.gd" id="1_r150o"]
 [ext_resource type="PackedScene" uid="uid://cjd3s65og8qi8" path="res://scenes/world/world_view.tscn" id="2_rvslj"]
+[ext_resource type="Texture2D" uid="uid://cxt0q6kgvxj1i" path="res://assets/textures/ui/exit_icon.svg" id="3_0bbpv"]
+[ext_resource type="Script" uid="uid://c8jjqv3kv15bn" path="res://scripts/presentation/interface/game_interface.gd" id="3_rarhs"]
+
+[sub_resource type="StyleBoxFlat" id="StyleBoxFlat_0bbpv"]
+bg_color = Color(0.78431374, 0.24313726, 0.24313726, 1)
+corner_radius_top_left = 5
+corner_radius_top_right = 5
+corner_radius_bottom_right = 5
+corner_radius_bottom_left = 5
+
+[sub_resource type="StyleBoxFlat" id="StyleBoxFlat_vcsgt"]
+bg_color = Color(0.6627451, 0.18431373, 0.18431373, 1)
+corner_radius_top_left = 5
+corner_radius_top_right = 5
+corner_radius_bottom_right = 5
+corner_radius_bottom_left = 5
+
+[sub_resource type="StyleBoxFlat" id="StyleBoxFlat_rarhs"]
+bg_color = Color(0.8784314, 0.32156864, 0.32156864, 1)
+corner_radius_top_left = 5
+corner_radius_top_right = 5
+corner_radius_bottom_right = 5
+corner_radius_bottom_left = 5
+
+[sub_resource type="StyleBoxEmpty" id="StyleBoxEmpty_c01mt"]
+
+[sub_resource type="StyleBoxFlat" id="StyleBoxFlat_c01mt"]
+content_margin_left = 8.0
+content_margin_right = 8.0
+bg_color = Color(0.1254902, 0.1254902, 0.1254902, 1)
+corner_radius_top_left = 5
+corner_radius_top_right = 5
+corner_radius_bottom_right = 5
+corner_radius_bottom_left = 5
+
+[sub_resource type="StyleBoxFlat" id="StyleBoxFlat_nxtc6"]
+content_margin_left = 8.0
+content_margin_right = 8.0
+bg_color = Color(0.14117648, 0.14117648, 0.14117648, 1)
+border_width_left = 1
+border_width_top = 1
+border_width_right = 1
+border_width_bottom = 1
+border_color = Color(0.4392157, 0.73333335, 0.84705883, 1)
+corner_radius_top_left = 5
+corner_radius_top_right = 5
+corner_radius_bottom_right = 5
+corner_radius_bottom_left = 5
+
+[sub_resource type="StyleBoxFlat" id="StyleBoxFlat_jlsqs"]
+content_margin_left = 2.0
+content_margin_top = 2.0
+content_margin_right = 2.0
+content_margin_bottom = 2.0
+bg_color = Color(0.18039216, 0.49019608, 0.19607843, 1)
+corner_radius_top_left = 5
+corner_radius_top_right = 5
+corner_radius_bottom_right = 5
+corner_radius_bottom_left = 5
+
+[sub_resource type="StyleBoxFlat" id="StyleBoxFlat_q8u5g"]
+content_margin_left = 2.0
+content_margin_top = 2.0
+content_margin_right = 2.0
+content_margin_bottom = 2.0
+bg_color = Color(0.105882354, 0.36862746, 0.1254902, 1)
+corner_radius_top_left = 5
+corner_radius_top_right = 5
+corner_radius_bottom_right = 5
+corner_radius_bottom_left = 5
+
+[sub_resource type="StyleBoxFlat" id="StyleBoxFlat_lhr70"]
+content_margin_left = 2.0
+content_margin_top = 2.0
+content_margin_right = 2.0
+content_margin_bottom = 2.0
+bg_color = Color(0.23137255, 0.5686275, 0.2509804, 1)
+corner_radius_top_left = 5
+corner_radius_top_right = 5
+corner_radius_bottom_right = 5
+corner_radius_bottom_left = 5
 
 [node name="Main" type="Node2D" unique_id=587542310]
 
@@ -9,3 +90,71 @@
 script = ExtResource("1_r150o")
 
 [node name="WorldView" parent="Game" unique_id=128235632 instance=ExtResource("2_rvslj")]
+
+[node name="Interface" type="CanvasLayer" parent="Game" unique_id=1446315952]
+script = ExtResource("3_rarhs")
+
+[node name="InterfaceRoot" type="Control" parent="Game/Interface" unique_id=1397735489]
+layout_mode = 3
+anchors_preset = 15
+anchor_right = 1.0
+anchor_bottom = 1.0
+grow_horizontal = 2
+grow_vertical = 2
+mouse_filter = 2
+
+[node name="ExitButton" type="Button" parent="Game/Interface/InterfaceRoot" unique_id=1119886151]
+layout_mode = 1
+anchors_preset = 1
+anchor_left = 1.0
+anchor_right = 1.0
+offset_left = -45.0
+offset_top = 15.0
+offset_right = -15.0
+offset_bottom = 45.0
+grow_horizontal = 0
+theme_override_styles/normal = SubResource("StyleBoxFlat_0bbpv")
+theme_override_styles/pressed = SubResource("StyleBoxFlat_vcsgt")
+theme_override_styles/hover = SubResource("StyleBoxFlat_rarhs")
+theme_override_styles/focus = SubResource("StyleBoxEmpty_c01mt")
+icon = ExtResource("3_0bbpv")
+icon_alignment = 1
+expand_icon = true
+
+[node name="SeedPanel" type="PanelContainer" parent="Game/Interface/InterfaceRoot" unique_id=575178438]
+layout_mode = 1
+offset_left = 15.0
+offset_top = 15.0
+offset_right = 335.0
+offset_bottom = 63.0
+
+[node name="SeedMargin" type="MarginContainer" parent="Game/Interface/InterfaceRoot/SeedPanel" unique_id=1792160855]
+layout_mode = 2
+theme_override_constants/margin_left = 8
+theme_override_constants/margin_top = 8
+theme_override_constants/margin_right = 8
+theme_override_constants/margin_bottom = 8
+
+[node name="SeedControls" type="HBoxContainer" parent="Game/Interface/InterfaceRoot/SeedPanel/SeedMargin" unique_id=1907094275]
+layout_mode = 2
+theme_override_constants/separation = 8
+
+[node name="SeedLabel" type="Label" parent="Game/Interface/InterfaceRoot/SeedPanel/SeedMargin/SeedControls" unique_id=935559366]
+layout_mode = 2
+text = "Seed:"
+vertical_alignment = 1
+
+[node name="SeedInput" type="LineEdit" parent="Game/Interface/InterfaceRoot/SeedPanel/SeedMargin/SeedControls" unique_id=1398138983]
+custom_minimum_size = Vector2(130, 0)
+layout_mode = 2
+size_flags_horizontal = 3
+theme_override_styles/normal = SubResource("StyleBoxFlat_c01mt")
+theme_override_styles/focus = SubResource("StyleBoxFlat_nxtc6")
+max_length = 20
+
+[node name="RegenerateButton" type="Button" parent="Game/Interface/InterfaceRoot/SeedPanel/SeedMargin/SeedControls" unique_id=344155869]
+layout_mode = 2
+theme_override_styles/normal = SubResource("StyleBoxFlat_jlsqs")
+theme_override_styles/pressed = SubResource("StyleBoxFlat_q8u5g")
+theme_override_styles/hover = SubResource("StyleBoxFlat_lhr70")
+text = "Generate"

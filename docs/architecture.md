@@ -1,491 +1,440 @@
 # Hither Architecture
 
 **Target milestone:** 0.1p  
-**Document status:** Draft  
-**Last updated:** 2026-09-15
+**Current implementation:** 0.022p  
+**Document status:** Working design  
+**Last updated:** 2026-10-20
 
----
+## Purpose
 
-# 1. Назначение документа
+This document records the current vision for Hither and the general structure of the application.
 
-Данный документ описывает архитектурную модель игры **Hither**.
+It includes both implemented foundations and planned systems. These are design intentions rather than immutable rules and may change as the project develops.
 
-Его цель — фиксировать принятые решения об устройстве мира и основных игровых сущностях по мере разработки. Документ служит источником истины для архитектуры проекта и меняется после обсуждения новых решений.
+Implementation details, individual classes and function signatures belong in the [code reference](code-reference.md). Content definitions and generation rules belong in the [world-generation reference](worldgeneration.md).
 
-Документ описывает фундаментальные принципы и границы целевого прототипа 0.1p. Подробные механики квестов, NPC, боя и экономики будут определены позднее.
+## Documentation structure
 
----
+Each project document has a distinct purpose:
 
-# 2. Философия проекта
+- [`README.md`](../README.md) — short project introduction and a concise description of the current playable functionality;
+- `architecture.md` — game vision, conceptual model and high-level application structure;
+- [`worldgeneration.md`](worldgeneration.md) — content encyclopedia and rules governing terrain, Features, generation and their interactions;
+- [`code-reference.md`](code-reference.md) — implemented classes, properties, functions and execution flows;
+- [`chronicles.md`](chronicles.md) — completed versions, development history, current milestone and nearest target.
 
-Hither — полу-текстовая RPG об исследовании неизвестного мира и его постепенном определении. Игрок выступает в роли исследователя и картографа; важная тема игры — энтропия.
+Information should be defined in one primary document and linked from the others rather than repeated.
 
-Исследование уменьшает неопределённость мира. Оно не просто открывает заранее созданную карту: новые места получают конкретное содержание в момент генерации, под влиянием истории открытий, действий игрока, правил мира и случайного выбора. Уже установленное не должно задним числом противоречить новым открытиям.
+## Game concept
 
-Мир не является набором случайных клеток. Он представляет собой систему взаимосвязанных сущностей и правил.
+Hither is a simulation-driven, semi-text RPG about exploring an unfamiliar finite world.
 
-При разработке проекта придерживаемся следующих принципов:
+The player acts as an explorer and cartographer. Exploration gradually reduces the uncertainty of the world: new locations receive definite content when generation is requested, while already established locations remain part of that world’s history.
 
-- мир существует независимо от игрока;
-- мир имеет собственное состояние, которое изменяется с течением времени;
-- исследование требует времени;
-- сгенерированные клетки и установленные объекты могут влиять на дальнейшую генерацию мира;
-- правила генерации определяются глобальными параметрами и локальными особенностями мира;
-- состояние мира, знания игрока о нём и отображаемая информация различаются.
+The world is intended to exist independently of the player and change over time. Player actions, previous discoveries, global rules, local conditions and chance may all affect what is generated next.
 
----
+## Design intentions
 
-# 3. Основные принципы архитектуры
+- The complete world is not generated in advance.
+- Generated locations remain spatially and historically consistent.
+- World state, player knowledge and displayed information are separate.
+- Exploration and most meaningful actions consume world time.
+- The simulation should remain independent of Godot scenes where practical.
+- Interface and presentation code may request or display changes but should not own the simulation.
+- New mechanics should be added without requiring a complete restructuring of the existing model.
+- The same simulation state should be usable by different presentation scenes.
 
-Проект разделяется на два уровня.
+## Conceptual game model
 
-## Логика
+### World
 
-Вся игровая логика должна быть максимально независимой от Godot.
+A `World` represents one playthrough.
 
-Она включает:
+The intended world model includes:
 
-- модель мира;
-- генерацию;
-- игровые правила;
-- расчёт времени;
-- взаимодействие игровых сущностей.
+- immutable parameters selected when the world is created;
+- mutable world state;
+- generated hexes;
+- regions and extended world objects;
+- active entities;
+- world time;
+- rules that influence future generation.
 
-Для предметных классов используется `RefCounted`: им не требуется место в дереве сцены. Узлы (`Node`) нужны для управления сценой, ввода и представления. В текущем прототипе `World`, `Tile`, `Sector`, `HexCoord` и `Feature` не входят в дерево сцены.
+The current implementation stores a generation seed and generated tiles. Other parts of the model will be added as they become necessary.
 
-## Представление
+### Hex
 
-Godot отвечает за:
+A hex is the smallest world-map location.
 
-- пользовательский интерфейс;
-- отображение мира;
-- ввод игрока;
-- воспроизведение звуков;
-- анимации.
+The code currently calls it a `Tile`. The terms *hex*, *tile* and *cell* refer to the same map unit unless a more specific distinction is introduced later.
 
-Представление не должно определять игровое состояние или правила. Карта и отдельная сцена текущего гекса могут развиваться независимо. Обе получают только сведения, доступные игроку, включая скрытые до исследования свойства места.
+Hexes use axial `q` and `r` coordinates and have six neighbours.
 
----
+A hex contains seven internal sectors but is not itself composed of seven smaller world-map hexes.
 
-# 4. Глоссарий
+### Sector
 
-Ниже приведены основные термины, используемые в проекте.
+A sector is a local position inside a hex.
 
-## World
+The six outer sectors are numbered clockwise from north:
 
-Игровой мир, существующий в рамках одной партии.
+| Index | Direction |
+|---:|---|
+| `0` | North |
+| `1` | North-east |
+| `2` | South-east |
+| `3` | South |
+| `4` | South-west |
+| `5` | North-west |
+| `6` | Centre |
 
-Каждая новая игра создаёт новый экземпляр мира.
+Sector numbers support orientation, local placement and generated text.
 
-Мир имеет:
+Each sector may contain no more than one Feature.
 
-- конечный размер;
-- собственные параметры;
-- собственное состояние;
-- собственное время.
+### Feature
 
----
+A Feature is meaningful local content occupying a sector.
 
-## Cell
+A Feature may remain unknown after its hex has been generated or discovered. Generation, discovery and interaction are separate events.
 
-Минимальная исследуемая единица мира.
+The main conceptual categories are:
 
-В прототипе 0.1p клетки являются шестиугольными и имеют шесть соседей. Их положение задаётся координатами гексагональной сетки. Форма мира не задана прямоугольным массивом: она складывается при исследовании.
+- **passive Feature** — affects the hex or actions within it and is usually observed rather than directly used;
+- **Encounter** — requires a decision or action and usually disappears after resolution;
+- **Place** — offers optional interaction and usually persists.
 
-Клетка является контейнером для локальной информации. В текущем коде базовый класс клетки называется `Tile`; понятия «клетка», «тайл» и «гекс» здесь относятся к одной минимальной единице карты.
+Some Places may later provide their own explorable spaces, such as buildings, caves, dungeons or labyrinths. In early versions they remain single interaction points.
 
----
+### Terrain and Features
 
-## Sector
+A terrain type describes the whole hex. A Feature occupies one sector inside that hex.
 
-Внутренняя позиция в пределах одного гекса. Она не является отдельным гексом мировой карты и имеет собственный номер от 0 до 6.
+Similar names do not imply that they are the same kind of object. For example:
 
-Сектора 0–5 расположены по кругу, начиная с северного и далее по часовой стрелке: 0 — северный, 1 — северо-восточный, 2 — юго-восточный, 3 — южный, 4 — юго-западный, 5 — северо-западный. Сектор 6 — центральный; он предусмотрен для особых видов Feature. Каждый сектор содержит не более одной Feature.
+- **Hill** is a terrain type;
+- **Watch Hill** is a Place of Interest.
 
-Номер сектора помогает ориентироваться внутри гекса и формировать игровые тексты. Он не заменяет координаты гекса в мире.
+Their exact rules and relationships belong in [`worldgeneration.md`](worldgeneration.md).
 
----
+### Region
 
-## Feature
+A Region is a larger area that provides context for multiple hexes.
 
-Общий термин для значимой особенности гекса, расположенной в одном из его секторов. Feature может оставаться неизвестной игроку после открытия самого гекса и обнаруживаться при исследовании.
+Examples may include forests, swamps, settlements or other coherent areas. A Region is not itself a hex and may affect terrain and Feature generation within it.
 
-Разновидности Feature включают пассивную особенность, встречу (`Encounter`) и место интереса (`Place` или `POI`). От разновидности зависит, требуется ли действие игрока и сохраняется ли Feature после него. Отдельные Feature могут влиять на дальнейшую генерацию и создавать другие Feature.
+Regions are planned but not implemented.
 
-Примеры: заболоченный участок — пассивная особенность, рой мошкары — встреча, Обзорный холм — место интереса.
+### WorldObject
 
----
+A WorldObject is a continuous object that may extend across multiple hexes.
 
-## Region
+Examples may include roads and rivers. Individual hexes contain local manifestations of the larger object.
 
-Крупная область мира.
+WorldObjects are planned but not implemented.
 
-Регион определяет общий контекст местности.
+### Entity
 
-Примеры:
+An Entity has its own state and may act or move independently.
 
-- лес;
-- город;
-- болото.
+The Player and NPCs are entities rather than Features. An NPC may temporarily occupy a hex or sector but is not part of that location’s fixed Feature content.
 
-Регион не является клеткой и может состоять из множества клеток с различными Feature.
+Entities are planned but not implemented.
 
----
+## State and knowledge
 
-## WorldObject
+The architecture distinguishes four related forms of data:
 
-Крупный объект мира, существующий сразу на нескольких клетках.
+### World state
 
-Примеры:
+What currently exists in the simulated world, whether or not the player knows about it.
 
-- река;
-- дорога.
+### Player knowledge
 
-В клетках хранится лишь локальное проявление такого объекта.
+What the player has discovered about the world.
 
-Например, конкретная клетка может содержать участок реки, тогда как сама река является единым мировым объектом.
+A generated hex or Feature may exist without being known to the player.
 
----
+### Presentation state
 
-# 5. Общая структура мира
+What a particular scene currently displays and how it displays it.
 
-На текущем этапе архитектура мира выглядит следующим образом:
+Presentation state includes camera position, selected objects, open interface elements and temporary visual effects. It must not replace simulation state.
+
+### Persistent history
+
+Generated locations, resolved encounters, world changes and other established facts may become part of the playthrough’s history.
+
+The exact save format has not been designed.
+
+## High-level application structure
+
+The intended dependency direction is:
+
+```text
+Input and interface
+        │
+        ▼
+Application coordination
+        │
+        ▼
+Simulation and player knowledge
+        │
+        ▼
+Presentation data
+        │
+        ▼
+Visual scenes and audio
+```
+
+The simulation must not depend on the scenes that display it.
+
+The current 0.022p structure is:
 
 ```text
 Game
- └── World
-      ├── World parameters
-      ├── World state
-      ├── Regions
-      ├── WorldObjects
-      ├── Cells
-      └── Player
+├── World
+│   └── Tile
+│       └── Sector
+│           └── Feature
+├── WorldSeedProvider
+├── WorldDebugPrinter
+├── GameInterface
+└── WorldView
+    └── HexView
+        └── FeatureView
+            └── FeatureVisual
 ```
 
-Данная структура является концептуальной и не определяет будущую структуру классов.
+This is the current implementation, not a required final class hierarchy.
 
----
+### Simulation
 
-# 6. World
+The simulation owns world state and rules.
 
-World представляет собой состояние одной игровой партии.
+Current simulation classes use `RefCounted` and do not belong to the scene tree.
 
-Именно World объединяет все остальные игровые сущности и координирует их взаимодействие.
+Implemented foundations include:
 
-World не отвечает за отображение информации игроку и не содержит элементов пользовательского интерфейса.
+- `World`;
+- axial coordinates;
+- terrain tiles;
+- seven sectors per tile;
+- the Feature hierarchy;
+- reproducible generation of the starting area.
 
-На данном этапе предполагается, что мир состоит из двух крупных частей:
+### Application coordination
 
-- неизменяемые параметры;
-- изменяемое состояние.
+The application layer connects simulation, interface and presentation.
 
----
+`Game` currently owns the active `World`, handles application-level requests and sends generated data to the world view.
 
-## 6.1. Неизменяемые параметры мира
+Supporting services currently include:
 
-Эти параметры задаются при создании новой игры и не изменяются в течение партии.
+- `WorldSeedProvider` for initial seed selection;
+- `WorldDebugPrinter` for temporary diagnostic output.
 
-Примеры:
+These responsibilities may be reorganized as the application grows.
 
-- число внутренних, не краевых гексов;
-- состав пула генерации и ограничения на типы гексов;
-- обязательные регионы;
-- обязательные Feature;
-- глобальные особенности мира.
+### Interface
 
-Некоторые миры могут иметь заранее определённые особенности.
+The interface collects player input and communicates requests through signals.
 
-Например:
+It should not directly own or modify the simulated world.
 
-- в мире обязательно существует город;
-- существует болото размером не менее пяти клеток;
-- существует древний храм;
-- южная граница мира представляет собой границу с Адом.
+The current `GameInterface` provides:
 
-Подобные особенности являются частью описания конкретного мира и влияют на его генерацию. Зерно генератора случайных чисел может использоваться для отдельных выборов, но оно не задаёт готовую карту: результат зависит также от порядка и обстоятельств исследования.
+- seed input;
+- a world-regeneration request;
+- visible invalid-input feedback;
+- an application-exit request.
 
-В версии 0.02p используется упрощённая воспроизводимая генерация. Один общий seed вместе с координатами гекса определяет тип местности, а вместе с номером сектора — его содержимое. Это позволяет повторять тесты независимо от порядка запросов. Более сложное влияние состояния мира и порядка исследования относится к последующим версиям.
+This is development-oriented interface functionality rather than the final game UI.
 
----
+### Presentation
 
-## 6.2. Изменяемое состояние мира
+Presentation converts available game data into scenes, visuals, text and sound.
 
-Во время игры мир постоянно изменяется.
+The current world-map presentation consists of:
 
-На текущем этапе в состояние мира входят:
+- `WorldView` for the displayed map;
+- `HexView` for one hex;
+- `FeatureView` for one visible Feature;
+- `FeatureVisual` resources for replaceable visual settings.
 
-- текущее игровое время;
-- время суток;
-- погодные условия (в будущем);
-- сезон (в будущем);
-- другие глобальные параметры, изменяющиеся во время партии;
-- уже сгенерированные гексы и состояние существующих сущностей.
+The current presentation receives complete generated tiles directly. Once player knowledge is implemented, presentation should receive only information available to the player.
 
-Тип гекса закрепляется в момент его первой генерации и в прототипе 0.1p не меняется. Генерация гекса, получение игроком сведений о нём и его посещение — отдельные события.
+## Presentation contexts
 
-## 6.3. Постепенная генерация и граница мира
+Hither is expected to use several presentation contexts for the same simulated world.
 
-Новый гекс генерируется только по запросу игровой механики. В прототипе 0.1p первое посещение гекса инициирует генерацию шести соседей; взаимодействие с Обзорным холмом может инициировать генерацию более дальних гексов. Генератор учитывает уже созданные соседние гексы, оставшийся пул, ограничения и текущие обстоятельства. Он может оценивать последствия выбора, но не назначает типы будущим гексам заранее.
+### World map
 
-Пул состоит преимущественно из джокеров, которые получают тип при генерации. Он также может содержать обязательные экземпляры типов. Пустырь допустим как резервный вариант, когда другой внутренний тип не подходит. Вероятности зависят от текущего состояния мира и не являются неизменным свойством типа.
+An isometric three-dimensional map used for orientation and movement between hexes.
 
-Размер мира задаёт количество внутренних гексов, а не форму карты. Краевые гексы образуют замкнутую границу; после исчерпания внутренних гексов оставшиеся необходимые краевые клетки становятся Обрывами. Обрыв может появиться и раньше по правилам генерации. Число краевых гексов определяется получившейся формой мира. Подробные правила описаны в `worldgeneration.md`.
+Each terrain type has its own visual appearance. Features are displayed in their sectors when they are known to the player. Empty or unknown sectors use suitable terrain decoration.
 
----
+This is the presentation context currently being developed.
 
-# 7. Время
+### Hex and sector exploration
 
-Время является одним из основных ресурсов игры.
+A separate scene for examining or moving within the current hex or one of its sectors.
 
-Практически каждое действие игрока требует времени.
+Its camera and controls may differ from the world map.
 
-Например:
+### Interactions
 
-- переход в соседнюю клетку;
-- исследование местности;
-- взаимодействие с объектами.
+Combat, dialogue and other focused interactions may use dedicated scenes or interfaces.
 
-Базовое правило на текущем этапе:
+### Internal spaces
 
-> Переход в соседнюю клетку занимает один игровой час.
+Some Places may later open their own navigable spaces.
 
-В дальнейшем различные действия смогут иметь собственную стоимость времени.
+An internal space may represent a dungeon, building, cave, garden or other contained location. It may use a square grid, free movement or another structure suitable for that Place.
 
----
+All presentation contexts should read and update the same underlying world state rather than creating separate versions of the world.
 
-## 7.1. Время суток
+## Reusable visual resources
 
-На текущем этапе используются четыре периода суток.
+Visual configuration should remain replaceable without changing simulation classes.
 
-- утро;
-- день;
-- вечер;
-- ночь.
+The current project stores terrain materials, Feature visuals and the outdoor environment as external resources.
 
-Каждый период по умолчанию длится шесть игровых часов.
+Exterior scenes may share:
 
-Время суток влияет на игровой процесс.
+- sky and atmospheric settings;
+- terrain and object materials;
+- visual definitions;
+- time-of-day information.
 
-Например:
+Individual scenes may still use their own cameras, local lights and composition.
 
-- ночью исследование становится опаснее;
-- некоторые клетки могут становиться временно непроходимыми;
-- отдельные Feature могут вести себя иначе в зависимости от времени суток.
+## World time
 
----
+World time is intended to be part of simulation state.
 
-## 7.2. Будущие расширения
+Actions such as movement, exploration and interaction consume time. The initial design uses four broad periods:
 
-В дальнейшем время может быть дополнено:
+- morning;
+- day;
+- evening;
+- night.
 
-- сезонами;
-- изменением продолжительности светового дня;
-- глобальными событиями.
+The current expected default duration is six hours per period, while ordinary movement to a neighbouring hex is expected to take one hour. These values may change during implementation and balancing.
 
-Конкретная реализация этих систем пока не определена.
+A future shared time service or `WorldClock` should provide a common time value to all gameplay and presentation contexts.
 
----
+Presentation systems may derive the following from that value:
 
-# 8. Cell
+- sun direction;
+- light color and intensity;
+- sky appearance;
+- environmental effects;
+- time-dependent interface information.
 
-Cell представляет собой минимальную исследуемую часть мира.
+Individual scenes should not maintain separate unsynchronized clocks.
 
-Клетка не является самостоятельным игровым объектом.
+World time is not implemented in 0.022p.
 
-Она служит контейнером локального состояния.
+## World generation
 
-Каждая клетка может содержать:
+The world is intended to be finite and generated gradually when requested by game mechanics.
 
-- ссылку на регион;
-- локальные проявления мировых объектов;
-- семь секторов с номерами 0–6, каждый из которых может содержать не более одной Feature;
-- состояние генерации и локальные свойства;
-- связи с локальными особенностями мира.
+The generator may consider:
 
-Сведения о том, какие гексы и Feature известны или посещены игроком, относятся к модели знаний игрока и не хранятся непосредственно в `Tile`.
+- world parameters;
+- previously generated locations;
+- neighbouring hexes;
+- remaining required content;
+- terrain and Feature rules;
+- current world state;
+- controlled random selection.
 
-Дополнительные данные будут добавляться по мере развития проекта.
+A seed is one input to generation rather than a complete predefined map.
 
----
+The current prototype uses a simpler coordinate-based deterministic generator so that tests can be repeated independently of exploration order.
 
-# 9. Feature
+Detailed terrain definitions, generation pools, probabilities, placement restrictions and Feature interactions belong in [`worldgeneration.md`](worldgeneration.md).
 
-Feature является общим названием для содержимого сектора, имеющего значение для исследования, действий игрока или правил мира. Каждая Feature принадлежит конкретному гексу и занимает один его внутренний сектор.
+## Player
 
-## 9.1. Разновидности Feature
+The Player represents the playable character.
 
-### Пассивная особенность
+The intended Player state may include:
 
-Обычно обнаруживается наблюдением и меняет свойства гекса или условия действий в нём. Прямого взаимодействия, кроме наблюдения, может не иметь. Например, заболоченный участок затрудняет проход. Он не исчезает из-за того, что игрок его обнаружил; внешние воздействия или события могут его изменить или уничтожить.
+- current location;
+- attributes and health;
+- fatigue;
+- inventory;
+- knowledge of the world;
+- other temporary or persistent conditions.
 
-### Encounter — встреча
+The first playable prototype is expected to include location, exploration, world knowledge, fatigue and rest.
 
-Требует от игрока действия или решения: боя, разговора, выбора способа преодолеть препятствие и т.п. После разрешения обычно исчезает. Рой мошкары, от которого нужно отмахнуться, — простой пример. Термин `Peril` («неприятность») может обозначать разновидность встречи, связанную с опасностью.
+The Player model is not implemented in 0.022p.
 
-### Place / POI — место интереса
+## NPCs
 
-Позволяет взаимодействовать по желанию и обычно остаётся на гексе после взаимодействия. Обзорный холм — место: игрок может на него подняться. В будущих версиях некоторые места смогут содержать собственное пространство, например подземелье, здание или лабиринт. В первых версиях место остаётся точкой взаимодействия в секторе.
+NPCs are intended to be independent entities with their own state.
 
-## 9.2. Влияние на мир и генерацию
+The architecture should allow NPCs to:
 
-Не каждая Feature меняет генерацию. Там, где это требуется, Feature может влиять на вероятности появления других особенностей, ограничивать их количество, создавать встречу или место и участвовать в формировании региона. Например, уникальность Обзорного холма может исключать появление второго такого места.
+- move through the world;
+- react to world changes and player actions;
+- interact with other entities;
+- appear, disappear or die;
+- continue acting independently of direct player observation.
 
-Генерация гекса и обнаружение его Feature игроком — разные процессы. Существование Feature может влиять на дальнейший мир до того, как игрок узнает о ней.
+Detailed NPC simulation belongs to a later milestone.
 
-В версии 0.02p Базовый лагерь является уникальным Place в центральном секторе стартового гекса. Обзорный холм также уникален и занимает центральный сектор одного из шести соседних гексов; его положение воспроизводимо определяется seed мира. `Nice Spot` служит примером неуникального Place и может появляться во внешних секторах разных гексов.
+## Target prototype 0.1p
 
-## 9.3. Границы ответственности
+The target for 0.1p is a small but complete exploration loop.
 
-Feature хранит собственное состояние и поведение, связанные с гексом. Пользовательский интерфейс, визуальное представление, мировое время и положение игрока относятся к другим системам.
+The player should be able to:
 
----
+- create a finite world;
+- explore it one hex at a time;
+- discover neighbouring locations;
+- view discovered information on the map;
+- interact with initial Features and Places;
+- spend world time;
+- accumulate fatigue;
+- return to the Base Camp and rest.
 
-# 10. Исследование и взаимодействие внутри гекса
+The prototype should include a small initial set of terrain and content. Their definitions and generation rules are maintained in [`worldgeneration.md`](worldgeneration.md).
 
-Открытие гекса не раскрывает автоматически все его Feature. Исследование может сообщить игроку, что находится в конкретном секторе; для текстовых описаний используются номер и направление сектора.
+## Current architectural foundation
 
-После обнаружения пассивную особенность можно учитывать при действиях, встречу — разрешить, а с местом — взаимодействовать по желанию. Правила поиска, перемещения между секторами и конкретные действия будут уточняться по мере разработки.
+Version 0.022p currently provides:
 
----
+- reproducible generation of a seven-hex starting area;
+- axial hex coordinates;
+- terrain tiles with seven internal sectors;
+- passive Features, Encounters and Places;
+- a unique Base Camp and Watch Hill;
+- three-dimensional world-map presentation;
+- external terrain, Feature and environment resources;
+- a fixed orthographic map camera;
+- an outdoor environment and directional sun;
+- runtime seed input and world regeneration;
+- an application exit control;
+- separation between simulation, interface and presentation responsibilities.
 
-# 11. Player
+This foundation is incomplete and does not yet constitute the target exploration loop.
 
-Player представляет игрового персонажа.
+## Future directions
 
-Игрок взаимодействует с миром исключительно через своего персонажа.
+Possible later systems include:
 
-Player не является частью описания мира (`World Definition`), но существует внутри конкретного мира и обладает собственным состоянием.
+- weather and seasons;
+- richer encounters;
+- inventory and character development;
+- NPC simulation;
+- quests and economy;
+- long-lived characters across multiple worlds;
+- death, inheritance and world succession;
+- expanded internal spaces;
+- additional world and interaction presentation modes.
 
-На текущем этапе архитектура предполагает, что Player может содержать:
-
-- текущее местоположение;
-- характеристики;
-- состояние здоровья;
-- инвентарь;
-- знания об исследованном мире;
-- усталость, которая в прототипе 0.1p накапливается при действиях и восполняется отдыхом.
-
-В дальнейшем список может быть расширен. Интерфейс и визуализация карты не должны раскрывать сведения, которых персонаж ещё не получил.
-
----
-
-# 12. NPC
-
-NPC являются самостоятельными сущностями игрового мира.
-
-Они не являются Feature гекса: NPC обладают собственным состоянием и могут перемещаться между гексами.
-
-NPC обладают собственным состоянием и способны существовать независимо от игрока.
-
-Архитектура должна допускать возможность того, что NPC:
-
-- перемещаются по миру;
-- изменяют своё состояние;
-- реагируют на изменения мира;
-- реагируют на действия игрока;
-- появляются и исчезают;
-- погибают.
-
-Несколько NPC могут одновременно находиться в одной области мира и влиять друг на друга либо на окружающую среду.
-
-Конкретные механизмы такого взаимодействия в прототипе 0.1p не определяются.
-
----
-
-# 13. World Objects и локальные Feature
-
-Следует различать протяжённые объекты мира и особенности конкретного гекса.
-
-## WorldObject
-
-Крупный объект мира, существующий сразу на нескольких клетках.
-
-Примеры:
-
-- река;
-- дорога.
-
-Такие объекты существуют независимо от игрока и могут пересекать множество клеток.
-
----
-
-## Локальная Feature
-
-Особенность, находящаяся в одном из секторов гекса. Она может быть пассивной, представлять собой встречу или место интереса.
-
-Например:
-
-- заболоченный участок;
-- рой мошкары;
-- Обзорный холм.
-
-Локальная Feature может возникнуть под влиянием региона или мирового объекта, но не тождественна им.
-
----
-
-# 14. Принципы проектирования
-
-При дальнейшем развитии архитектуры предполагается соблюдать следующие принципы.
-
-## Независимость логики
-
-Игровая логика не должна зависеть от пользовательского интерфейса или сцены Godot.
-
----
-
-## Мир существует независимо от игрока
-
-Игрок исследует уже существующий мир.
-
-Изменения мира могут происходить независимо от действий игрока.
-
----
-
-## Feature участвует в устройстве мира
-
-Отдельные Feature могут влиять на структуру и правила генерации мира; другие существуют только как локальное содержимое гекса.
-
----
-
-## Сущности обладают собственным состоянием
-
-Player, NPC и другие самостоятельные сущности обладают собственным состоянием, которое может изменяться в течение игры.
-
----
-
-## Архитектура должна оставаться расширяемой
-
-Новые игровые механики должны добавляться без необходимости изменять фундаментальную структуру проекта.
-
----
-
-# 15. Границы игрового прототипа 0.1p
-
-Цель первого прототипа — завершённый минимальный цикл исследования: создать небольшой мир, перемещаться по гексам, узнавать соседние места, тратить время, уставать и отдыхать. Нужны простая карта, первые текстовые описания и заготовка взаимодействия с текущим гексом.
-
-Начальный набор типов включает Опушку, Лес, Пустырь и Обрыв; правила генерации также предусматривают Холм. Среди первых мест интереса — Базовый лагерь и Обзорный холм. Тексты ситуаций и особенностей должны иметь устойчивые идентификаторы и храниться отдельно от логики.
-
-# 16. За пределами прототипа 0.1p
-
-Следующие направления рассматриваются, но пока не являются частью архитектуры прототипа 0.1p.
-
-- погодная система;
-- смена сезонов;
-- долгоживущие персонажи, существующие между разными мирами;
-- возраст персонажей и NPC;
-- система смерти и возрождения;
-- наследование характеристик между мирами;
-- модель игровых событий;
-- система опасностей (Perils);
-- экономика;
-- квестовая система.
-
----
-
-# Заключение
-
-Данный документ фиксирует фундаментальную архитектуру проекта Hither на раннем этапе разработки.
-
-Он не описывает игровые механики, баланс или пользовательский интерфейс.
-
-По мере развития проекта документ может дополняться новыми разделами, однако уже существующие архитектурные решения должны изменяться только после их осознанного пересмотра.
+These directions remain provisional and do not define the scope of 0.1p.

@@ -1,29 +1,25 @@
 [gd_scene format=3 uid="uid://cjd3s65og8qi8"]
 
 [ext_resource type="Script" uid="uid://ct0luxrj3ba51" path="res://scripts/presentation/world/world_view.gd" id="1_0sknw"]
-
-[sub_resource type="Environment" id="Environment_0sknw"]
-background_mode = 1
-background_color = Color(0.3497284, 0.6698687, 0.82006395, 1)
-ambient_light_source = 2
-ambient_light_color = Color(1, 1, 1, 1)
-ambient_light_energy = 0.65
+[ext_resource type="Environment" uid="uid://bu3dlbidwj1rb" path="res://assets/environments/outdoor_environment.tres" id="2_gmysx"]
 
 [node name="WorldView" type="Node3D" unique_id=128235632]
 script = ExtResource("1_0sknw")
 
 [node name="Tiles" type="Node3D" parent="." unique_id=857322792]
 
-[node name="WorldEnvironment" type="WorldEnvironment" parent="." unique_id=1371572007]
-environment = SubResource("Environment_0sknw")
-
-[node name="DirectionalLight3D" type="DirectionalLight3D" parent="." unique_id=370128328]
-transform = Transform3D(0.8660254, 0.40957603, -0.28678823, 0, 0.57357645, 0.81915206, 0.5, -0.7094065, 0.49673176, 0, 0, 0)
-shadow_enabled = true
-
 [node name="Camera3D" type="Camera3D" parent="." unique_id=964734879]
-transform = Transform3D(0.8910065, -0.2338224, 0.38914582, 0, 0.8571673, 0.5150381, -0.45399052, -0.4589023, 0.7637417, 4.5, 6, 8.9)
+transform = Transform3D(0.9396926, -0.23325717, 0.2501377, 0, 0.7313537, 0.6819984, -0.34202012, -0.64086884, 0.6872477, 3.2, 9.3, 9)
 v_offset = 0.25
 projection = 1
 current = true
-size = 5.5
+size = 6.2
+
+[node name="Lighting" type="Node3D" parent="." unique_id=1263007527]
+
+[node name="WorldEnvironment" type="WorldEnvironment" parent="Lighting" unique_id=1371572007]
+environment = ExtResource("2_gmysx")
+
+[node name="Sun" type="DirectionalLight3D" parent="Lighting" unique_id=370128328]
+transform = Transform3D(0.8660254, 0.35355338, -0.35355338, 0, 0.70710677, 0.70710677, 0.5, -0.6123724, 0.6123724, 0, 0, 0)
+shadow_enabled = true

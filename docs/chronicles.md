@@ -29,14 +29,13 @@ Prototype 0.03p is intended to complete the first visual representation of the g
 
 The remaining work is:
 
-- create readable prototype placeholders for the implemented Feature types;
+- create readable prototype images for the implemented Feature types;
 - add decorative visual variants for empty sectors;
 - keep decorative selection reproducible for the same world seed and coordinates;
-- add a red exit button with a white cross in the upper-right corner;
 - verify that every generated tile, terrain type and occupied sector is displayed correctly;
 - update the project version and documentation to 0.03p.
 
-Camera controls, player movement, hex interaction and other interface elements belong to later versions.
+Camera controls, player movement, hex interaction, clouds and world-time simulation belong to later versions.
 
 ---
 
@@ -93,4 +92,29 @@ Prototype 0.021p began the visualization work planned for 0.03p:
 - `--seed=<number>` remains available as a command-line override;
 - `docs/code-reference.md` documents the classes and functions implemented through version 0.021p.
 
-The project now remains running after generation instead of terminating automatically.
+The project remains running after generation so the displayed world can be inspected.
+
+### Environment and runtime controls — 0.022p
+
+**Date:** 2026-10-20
+
+Prototype 0.022p added a reusable outdoor environment, application controls and runtime world regeneration:
+
+- the world scene uses a named `Sun` directional light with shadows;
+- a procedural sky provides an atmospheric color gradient;
+- the outdoor environment is stored as a reusable resource for later exterior scenes;
+- the orthographic camera is reframed for a clearer view of the generated starting area;
+- the application interface is displayed through a dedicated `CanvasLayer`;
+- a red exit button safely ends the running game;
+- the interface displays the seed used to generate the active world;
+- a new seed can be entered without restarting the application;
+- the Generate button and Enter key regenerate the world;
+- an empty seed field uses the default value `12345`;
+- invalid seed input keeps the existing world and receives visible error highlighting;
+- command-line and file-based startup seeds remain supported;
+- `GameInterface` forwards interface requests without owning the simulation;
+- `WorldSeedProvider` resolves the initial world seed;
+- `WorldDebugPrinter` contains temporary diagnostic output;
+- `Game` retains responsibility for the active `World` and coordinates generation and visualization.
+
+This version establishes the runtime controls needed to inspect different generated starting areas before the remaining visual placeholders and empty-sector decorations are added.

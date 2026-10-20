@@ -1,11 +1,11 @@
 # Code Reference
 
-**Implementation version:** 0.021p  
-**Engine:** Godot 4.7  
+**Implementation version:** 0.022p  
+**Engine:** Godot 4.7.1  
 **Language:** GDScript  
 **Related document:** [`architecture.md`](architecture.md)
 
-This document describes the classes, data structures, functions, generation flow, and presentation layer present in version 0.021p.
+This document describes the classes, data structures, functions, generation flow, interface, and presentation layer present in version 0.022p.
 
 The source code remains authoritative for exact function signatures. This document explains the responsibilities, relationships, inputs, outputs, and current behavior of the code.
 
@@ -13,9 +13,11 @@ The source code remains authoritative for exact function signatures. This docume
 
 - [Conventions](#conventions)
 - [Class hierarchy](#class-hierarchy)
-- [Entry point](#entry-point)
+- [Application layer](#application-layer)
   - [Game script](#game-script)
-- [Startup flow](#startup-flow)
+  - [WorldSeedProvider](#worldseedprovider)
+  - [WorldDebugPrinter](#worlddebugprinter)
+- [Startup and regeneration flow](#startup-and-regeneration-flow)
 - [World generation flow](#world-generation-flow)
 - [World model](#world-model)
   - [World](#world)
@@ -33,7 +35,9 @@ The source code remains authoritative for exact function signatures. This docume
   - [BaseCamp](#basecamp)
   - [NiceSpot](#nicespot)
   - [WatchHill](#watchhill)
-- [Presentation layer](#presentation-layer)
+- [Interface layer](#interface-layer)
+  - [GameInterface](#gameinterface)
+- [World presentation layer](#world-presentation-layer)
   - [WorldView](#worldview)
   - [HexView](#hexview)
   - [FeatureView](#featureview)
@@ -44,14 +48,16 @@ The source code remains authoritative for exact function signatures. This docume
 
 ## Conventions
 
-- Classes derived from `RefCounted` represent simulation data and do not belong to the Godot scene tree.
+- Classes derived from `RefCounted` represent simulation data or stateless services and do not belong to the Godot scene tree.
 - Classes derived from `Node3D` represent objects in the three-dimensional presentation layer.
+- Classes derived from `CanvasLayer` represent screen-space interface elements.
 - Classes derived from `Resource` store reusable external configuration.
 - Stable internal identifiers use lowercase `snake_case`, for example `forest`, `base_camp`, and `watch_hill`.
-- Methods whose names begin with `_` are constructors, Godot lifecycle callbacks, or internal implementation methods.
+- Methods whose names begin with `_` are constructors, Godot lifecycle callbacks, signal handlers, or internal implementation methods.
 - Axial hex coordinates use the `q` and `r` axes.
-- The simulation layer does not depend on the presentation layer.
-- The presentation layer reads simulation data without owning or modifying it.
+- The simulation layer does not depend on the interface or presentation layers.
+- Presentation classes read simulation data without owning or modifying it.
+- `GameInterface` sends user requests through signals and does not create or modify the active world.
 - Each tile contains seven sectors:
   - `0` — north;
   - `1` — north-east;
@@ -67,6 +73,8 @@ The source code remains authoritative for exact function signatures. This docume
 
 - `Node`
   - [Game script](#game-script)
+- `CanvasLayer`
+  - [`GameInterface`](#gameinterface)
 - `Node3D`
   - [`WorldView`](#worldview)
   - [`HexView`](#hexview)
@@ -74,6 +82,8 @@ The source code remains authoritative for exact function signatures. This docume
 - `Resource`
   - [`FeatureVisual`](#featurevisual)
 - `RefCounted`
+  - [`WorldSeedProvider`](#worldseedprovider)
+  - [`WorldDebugPrinter`](#worlddebugprinter)
   - [`World`](#world)
   - [`HexCoord`](#hexcoord)
   - [`Tile`](#tile)
@@ -88,7 +98,7 @@ The source code remains authoritative for exact function signatures. This docume
       - [`WatchHill`](#watchhill)
   - [`TileEnums`](#tileenums)
 
-## Entry point
+## Application layer
 
 ### Game script
 
@@ -97,79 +107,33 @@ The source code remains authoritative for exact function signatures. This docume
 **Scene:** [`res://scenes/Main.tscn`](../scenes/Main.tscn)  
 **Named class:** none
 
-Coordinates project startup.
+Coordinates application startup, world generation, visualization, and application-level interface requests.
 
-The script:
+`Game` owns the active [`World`](#world). It receives requests from [`GameInterface`](#gameinterface), creates a new world when required, and passes generated tiles to [`WorldView`](#worldview).
 
-- determines the world seed;
-- creates the active [`World`](#world);
-- generates the starting area;
-- passes generated tiles to [`WorldView`](#worldview);
-- prints the generated state for debugging.
-
-World generation and visual rendering remain delegated to their respective classes.
-
-### Constants
-
-#### `DEFAULT_WORLD_SEED: int = 12345`
-
-Fallback seed used when no valid external seed can be obtained.
-
-#### `SEED_ARGUMENT_PREFIX: String = "--seed="`
-
-Prefix used to locate an explicit command-line seed.
-
-Example:
-
-`--seed=98765`
-
-#### `WORLD_SEED_FILE_PATH: String = "res://config/world_seed.txt"`
-
-Path to the text file used for ordinary development runs.
-
-The file must contain one integer.
+Seed resolution, debug formatting, interface behavior, simulation, and rendering are delegated to their respective classes.
 
 ### Properties
 
 #### `world: World`
 
-Active generated world owned by the game script.
+The active generated world.
+
+When another valid seed is submitted, this property is replaced with a newly created `World`.
 
 #### `world_view: WorldView`
 
-Reference to the `WorldView` child node.
+Reference to the `$WorldView` child node.
 
-Initialized when the `Game` node becomes ready.
+Receives the generated starting-area tiles and creates their visual representation.
+
+#### `game_interface: GameInterface`
+
+Reference to the `$Interface` child node.
+
+Provides world-generation and application-exit requests through signals.
 
 ### Methods
-
-#### `_get_startup_message() -> String`
-
-Reads the application name and version from [`project.godot`](../project.godot).
-
-Returns a string in this form:
-
-`=== Hither v0.021p started ===`
-
-#### `_get_world_seed() -> int`
-
-Selects the seed used to generate the world.
-
-The current priority is:
-
-1. valid `--seed=<number>` command-line argument;
-2. valid integer stored in `config/world_seed.txt`;
-3. `DEFAULT_WORLD_SEED`.
-
-An empty `--seed=` argument is treated as absent and allows the file to be read.
-
-An invalid non-empty command-line value produces a warning and returns the default seed.
-
-The file also falls back to the default when it:
-
-- does not exist;
-- is empty;
-- does not contain a valid integer.
 
 #### `_ready() -> void`
 
@@ -177,14 +141,135 @@ Godot lifecycle callback executed when the `Game` node enters the scene tree.
 
 It performs the current startup sequence:
 
-1. prints the startup message;
-2. obtains the world seed;
-3. creates a `World`;
-4. generates the starting area;
-5. sends the generated tiles to `WorldView`;
-6. prints the generated tiles and features.
+1. connects `GameInterface.world_generation_requested`;
+2. connects `GameInterface.exit_requested`;
+3. prints the startup message;
+4. asks [`WorldSeedProvider`](#worldseedprovider) for the startup seed;
+5. displays that seed in the interface;
+6. generates and displays the initial world.
 
-#### `_print_starting_area(starting_tiles: Array[Tile]) -> void`
+#### `_generate_world(world_seed: int) -> void`
+
+Creates and displays a new world using `world_seed`.
+
+The method:
+
+1. creates `World.new(world_seed)`;
+2. assigns it to `world`;
+3. calls `World.generate_starting_area()`;
+4. passes the returned tiles to `WorldView.display_tiles()`;
+5. passes the same tiles to `WorldDebugPrinter.print_starting_area()`.
+
+The previous `World` reference is replaced. Existing visual tile nodes are removed by `WorldView` when the new tiles are displayed.
+
+#### `_on_world_generation_requested(seed_text: String) -> void`
+
+Handles a world-generation request emitted by `GameInterface`.
+
+Current behavior:
+
+- an empty string uses `WorldSeedProvider.DEFAULT_SEED`;
+- a valid integer string creates a new world with that integer;
+- invalid text produces a warning, preserves the current world, and calls `GameInterface.show_seed_error()`.
+
+For an empty or valid seed, the normalized integer value is written back to the interface before generation.
+
+#### `_on_exit_requested() -> void`
+
+Handles `GameInterface.exit_requested`.
+
+Calls:
+
+`get_tree().quit()`
+
+This ends the running application when the player presses the exit button.
+
+#### `_get_startup_message() -> String`
+
+Reads the application name and version from [`project.godot`](../project.godot).
+
+Returns a string in this form:
+
+`=== Hither v0.022p started ===`
+
+---
+
+### WorldSeedProvider
+
+**Script:** [`res://scripts/core/world_seed_provider.gd`](../scripts/core/world_seed_provider.gd)  
+**Base class:** `RefCounted`
+
+Resolves the seed used for initial world generation.
+
+The class is stateless. Its constants and methods are static, so creating a `WorldSeedProvider` instance is unnecessary.
+
+Seed selection performed after startup through the interface is handled by [`Game`](#game-script). `WorldSeedProvider` is responsible only for the initial seed.
+
+### Constants
+
+#### `DEFAULT_SEED: int = 12345`
+
+Fallback seed used when no valid external startup seed can be obtained.
+
+The same value is used when the player submits an empty seed field.
+
+#### `ARGUMENT_PREFIX: String = "--seed="`
+
+Prefix used to locate an explicit command-line seed.
+
+Example:
+
+`--seed=98765`
+
+#### `SEED_FILE_PATH: String = "res://config/world_seed.txt"`
+
+Path to the development seed file.
+
+The file is expected to contain one integer.
+
+### Methods
+
+#### `WorldSeedProvider.get_startup_seed() -> int`
+
+Returns the seed used for initial world generation.
+
+The current priority is:
+
+1. a valid `--seed=<number>` command-line argument;
+2. a valid integer in `config/world_seed.txt`;
+3. `DEFAULT_SEED`.
+
+Command-line behavior:
+
+- a valid integer is returned immediately;
+- an empty `--seed=` value allows seed resolution to continue to the file;
+- an invalid non-empty value produces a warning and returns the default seed.
+
+Seed-file behavior:
+
+- a valid integer is returned;
+- a missing file produces a warning and returns the default;
+- an empty file produces a warning and returns the default;
+- invalid file contents produce a warning and return the default.
+
+The file is read only during initial startup. Regenerating the world from the interface does not modify it.
+
+---
+
+### WorldDebugPrinter
+
+**Script:** [`res://scripts/debug/world_debug_printer.gd`](../scripts/debug/world_debug_printer.gd)  
+**Base class:** `RefCounted`
+
+Formats and prints temporary debugging information about generated worlds.
+
+The class is stateless. Its methods are static.
+
+`WorldDebugPrinter` does not generate or modify simulation data.
+
+### Methods
+
+#### `WorldDebugPrinter.print_starting_area(starting_tiles: Array[Tile]) -> void`
 
 Prints the starting tile and its six neighbours.
 
@@ -200,20 +285,20 @@ The expected array order is:
 
 Each tile is passed to `_print_tile_features()`.
 
-#### `_print_tile_features(tile: Tile) -> void`
+#### `WorldDebugPrinter._print_tile_features(tile: Tile) -> void`
 
 Prints every occupied sector of the supplied tile.
 
-For each feature, it prints:
+For each occupied sector, it prints:
 
 - sector index;
 - readable sector position;
-- feature category;
+- broad feature category;
 - feature type ID.
 
 Prints `No features` when every sector is empty.
 
-#### `_get_feature_kind(feature: Feature) -> String`
+#### `WorldDebugPrinter._get_feature_kind(feature: Feature) -> String`
 
 Returns a temporary readable category for a feature.
 
@@ -223,7 +308,7 @@ Current results:
 - `place` for [`Place`](#place);
 - `feature` for other [`Feature`](#feature) instances.
 
-#### `_get_position_name(position_index: int) -> String`
+#### `WorldDebugPrinter._get_position_name(position_index: int) -> String`
 
 Converts a sector localization key into a temporary English name.
 
@@ -231,34 +316,81 @@ For example:
 
 `sector.north_east` becomes `North East`.
 
-This debug conversion does not replace the future localization system.
+This conversion is used only for debug output and does not replace the future localization system.
 
 ---
 
-## Startup flow
+## Startup and regeneration flow
+
+### Initial startup
 
 The following sequence is executed when the project starts:
 
 1. [`Main.tscn`](../scenes/Main.tscn) creates the `Game` node.
-2. The `Game` node contains an instantiated [`WorldView`](#worldview).
-3. `WorldView` and its child nodes become ready.
-4. `Game._ready()` prints the application name and version.
-5. `Game._get_world_seed()` determines the seed.
-6. `Game` creates `World.new(world_seed)`.
-7. `World.generate_starting_area()` returns seven generated tiles.
-8. `Game` calls `WorldView.display_tiles(starting_tiles)`.
-9. `WorldView` creates one [`HexView`](#hexview) for each tile.
-10. Each `HexView` selects a terrain material and creates visual representations of occupied sectors.
-11. `Game` prints the same generated data to the debug console.
-12. The project remains running.
+2. `Game` receives its `WorldView` and `GameInterface` child references.
+3. `GameInterface._ready()` prepares the seed-input styles and connects its controls.
+4. `Game._ready()` connects the two interface signals.
+5. `Game` prints the project name and version.
+6. `WorldSeedProvider.get_startup_seed()` resolves the initial seed.
+7. `GameInterface.set_world_seed()` displays the selected seed.
+8. `Game._generate_world()` creates a new `World`.
+9. `World.generate_starting_area()` returns seven generated tiles.
+10. `WorldView.display_tiles()` creates the three-dimensional map.
+11. `WorldDebugPrinter.print_starting_area()` prints the generated data.
+12. The project remains running and accepts interface input.
+
+### Valid seed regeneration
+
+When the player enters a valid integer and presses `Generate` or `Enter`:
+
+1. `GameInterface` strips leading and trailing whitespace.
+2. `GameInterface` emits `world_generation_requested`.
+3. `Game._on_world_generation_requested()` validates the string.
+4. The text is converted to an integer.
+5. The normalized integer is displayed in the seed field.
+6. `Game._generate_world()` creates a new `World`.
+7. `WorldView` removes the old visual tiles.
+8. The new starting area is generated and displayed.
+9. The new generated data is printed to the debug console.
+
+The seed stored in `config/world_seed.txt` is not changed.
+
+### Empty seed regeneration
+
+When the submitted field is empty:
+
+1. `Game` selects `WorldSeedProvider.DEFAULT_SEED`;
+2. the field is changed to `12345`;
+3. a new world is generated with seed `12345`.
+
+### Invalid seed submission
+
+When the submitted text is neither empty nor a valid integer:
+
+1. the current `World` remains active;
+2. the displayed map is not replaced;
+3. a warning is sent to the debugger;
+4. `GameInterface.show_seed_error()` marks the input;
+5. the seed text becomes selected for correction.
+
+Editing the field removes the visual error indication.
+
+### Application exit
+
+When the exit button is pressed:
+
+1. `GameInterface` emits `exit_requested`;
+2. `Game._on_exit_requested()` receives the signal;
+3. the scene tree is asked to quit;
+4. the application process ends normally.
 
 ---
 
 ## World generation flow
 
-This section describes the exact generation sequence implemented in 0.021p.
+This section describes the exact generation sequence implemented in 0.022p.
 
-The underlying generation algorithm is unchanged from 0.02p. Version 0.021p adds visualization and an external development seed file.
+The generation algorithm itself is unchanged from 0.02p. Versions 0.021p and 0.022p add presentation, environment, interface, and runtime regeneration around it.
 
 General generation rules and architectural requirements belong in [`architecture.md`](architecture.md). This section records how the current code executes those rules.
 
@@ -325,11 +457,11 @@ The central sector at index `6` is reserved for separately placed content.
 
 For each outer sector:
 
-1. A new `RandomNumberGenerator` is created.
-2. The generator receives a seed derived from the tile coordinate and sector index.
-3. A number from `0` to `99` is generated.
-4. The result determines the content.
-5. Non-empty content is placed with `Sector.set_feature()`.
+1. a new `RandomNumberGenerator` is created;
+2. the generator receives a seed derived from the tile coordinate and sector index;
+3. a number from `0` to `99` is generated;
+4. the result determines the content;
+5. non-empty content is placed with `Sector.set_feature()`.
 
 Current result ranges:
 
@@ -538,7 +670,7 @@ Creates an axial coordinate with the supplied values.
 
 #### `HexCoord.get_neighbor(direction_index: int) -> HexCoord`
 
-Returns a new coordinate for the neighbouring tile in direction `direction_index`.
+Returns a new coordinate for the neighbouring tile in `direction_index`.
 
 The accepted range is `0–5`.
 
@@ -609,6 +741,8 @@ Creates sectors `0–6`.
 Returns the sector at `sector_index`.
 
 The accepted range is `0–6`.
+
+An assertion fails for an index outside that range.
 
 ---
 
@@ -898,7 +1032,153 @@ Creates a place with the type ID `watch_hill`.
 
 ---
 
-## Presentation layer
+## Interface layer
+
+### GameInterface
+
+**Script:** [`res://scripts/presentation/interface/game_interface.gd`](../scripts/presentation/interface/game_interface.gd)  
+**Scene:** [`res://scenes/Main.tscn`](../scenes/Main.tscn)  
+**Base class:** `CanvasLayer`
+
+Handles the current application-level interface.
+
+The class reads interface controls and emits requests. It does not create, own, or modify the active world.
+
+### Constants
+
+#### `INVALID_SEED_COLOR: Color`
+
+Color used for invalid seed text and the seed field’s focus border.
+
+The current value is a red error color.
+
+### Signals
+
+#### `world_generation_requested(seed_text: String)`
+
+Emitted when the player requests world generation.
+
+The argument contains the trimmed contents of the seed input field.
+
+The signal does not guarantee that the text contains a valid integer. Validation belongs to [`Game`](#game-script).
+
+#### `exit_requested`
+
+Emitted when the player presses the exit button.
+
+[`Game`](#game-script) responds by requesting application shutdown.
+
+### Properties
+
+#### `seed_input_focus_style: StyleBoxFlat`
+
+Runtime duplicate of the seed field’s configured focus style.
+
+The duplicate allows the interface to change the focus-border color without modifying the original shared style resource.
+
+#### `normal_seed_border_color: Color`
+
+Original focus-border color restored after an input error is cleared.
+
+#### `seed_input: LineEdit`
+
+Reference to:
+
+`$InterfaceRoot/SeedPanel/SeedMargin/SeedControls/SeedInput`
+
+Displays the active seed and accepts another seed from the player.
+
+#### `regenerate_button: Button`
+
+Reference to:
+
+`$InterfaceRoot/SeedPanel/SeedMargin/SeedControls/RegenerateButton`
+
+Emits a world-generation request using the current field contents.
+
+#### `exit_button: Button`
+
+Reference to:
+
+`$InterfaceRoot/ExitButton`
+
+Emits an application-exit request.
+
+### Methods
+
+#### `GameInterface._ready() -> void`
+
+Prepares the seed-input styles and connects the interface controls.
+
+The method:
+
+1. obtains the configured `focus` style from `SeedInput`;
+2. verifies that it is a `StyleBoxFlat`;
+3. duplicates it;
+4. stores its original border color;
+5. applies the duplicate as a local style override;
+6. connects the Generate button;
+7. connects seed submission through `Enter`;
+8. connects seed text changes;
+9. connects the exit button.
+
+#### `GameInterface.set_world_seed(seed_value: int) -> void`
+
+Displays `seed_value` in the seed input field.
+
+Also clears any previously displayed seed error.
+
+#### `GameInterface.show_seed_error() -> void`
+
+Displays the invalid-seed state.
+
+The method:
+
+- changes the text color;
+- changes the focus-border color;
+- sets the tooltip to `Seed must be a whole number.`;
+- gives focus to the field;
+- selects all current text.
+
+#### `GameInterface._clear_seed_error() -> void`
+
+Removes the invalid-seed indication.
+
+The method:
+
+- removes the custom font color;
+- restores the normal focus-border color;
+- clears the tooltip.
+
+#### `GameInterface._request_world_generation(seed_text: String) -> void`
+
+Strips leading and trailing whitespace from `seed_text` and emits `world_generation_requested`.
+
+#### `GameInterface._on_regenerate_button_pressed() -> void`
+
+Handles the Generate button.
+
+Passes the current field contents to `_request_world_generation()`.
+
+#### `GameInterface._on_seed_input_text_submitted(submitted_text: String) -> void`
+
+Handles `Enter` pressed in the seed input.
+
+Passes the submitted text to `_request_world_generation()`.
+
+#### `GameInterface._on_seed_input_text_changed(_new_text: String) -> void`
+
+Clears the error indication as soon as the player edits the field.
+
+The new text is not validated until another generation request is submitted.
+
+#### `GameInterface._on_exit_button_pressed() -> void`
+
+Emits `exit_requested`.
+
+---
+
+## World presentation layer
 
 ### WorldView
 
@@ -912,11 +1192,10 @@ Displays generated tiles as a three-dimensional hexagonal map.
 
 The scene also owns the current:
 
-- orthographic camera;
-- directional light;
-- environment;
-- blue background;
-- container for generated `HexView` instances.
+- tile-view container;
+- fixed orthographic camera;
+- outdoor environment;
+- directional sunlight.
 
 ### Constants
 
@@ -973,6 +1252,8 @@ This formula produces the same arrangement as `HexCoord.NEIGHBOR_DIRECTIONS`.
 #### `WorldView._clear_tiles() -> void`
 
 Queues all existing children of `tiles_container` for deletion before a new map is displayed.
+
+Deletion occurs through Godot’s `queue_free()` mechanism.
 
 ---
 
@@ -1155,7 +1436,7 @@ The method then applies:
 **Script:** [`res://scripts/presentation/world/feature_visual.gd`](../scripts/presentation/world/feature_visual.gd)  
 **Base class:** `Resource`
 
-Stores the replaceable presentation settings for one feature type.
+Stores replaceable presentation settings for one feature type.
 
 Keeping these values outside `FeatureView` allows placeholder visuals to be replaced without changing rendering code or simulation classes.
 
@@ -1200,28 +1481,48 @@ Current relevant hierarchy:
 ```text
 Main
 └── Game
-    └── WorldView
+    ├── WorldView
+    └── Interface
+        └── InterfaceRoot
+            ├── ExitButton
+            └── SeedPanel
+                └── SeedMargin
+                    └── SeedControls
+                        ├── SeedLabel
+                        ├── SeedInput
+                        └── RegenerateButton
 ```
 
-`Game` owns the simulation and calls its child `WorldView`.
+`Game` owns the active world and coordinates its two presentation children.
+
+`Interface` is a `CanvasLayer`, so its controls remain in screen space independently of the three-dimensional camera.
 
 ### World view scene
 
 [`res://scenes/world/world_view.tscn`](../scenes/world/world_view.tscn)
 
+Current relevant hierarchy:
+
 ```text
 WorldView
 ├── Tiles
-├── WorldEnvironment
-├── DirectionalLight3D
-└── Camera3D
+├── Camera3D
+└── Lighting
+    ├── WorldEnvironment
+    └── Sun
 ```
 
 The current camera:
 
 - uses orthographic projection;
 - has a fixed isometric-style angle;
-- has no runtime controls.
+- has no runtime movement or zoom controls.
+
+The `Sun` node is a `DirectionalLight3D`.
+
+It provides directional outdoor lighting and shadows. Its position in the scene is not significant; its rotation determines the direction of the light.
+
+The sun is not yet connected to a world clock or shared time-of-day system.
 
 ### Hex view scene
 
@@ -1243,7 +1544,7 @@ HexView
 
 `Body` and `Surface` are separate six-sided `CylinderMesh` instances.
 
-This allows the terrain surface and side walls to use independent assets.
+This allows the terrain surface and side walls to use independent materials or textures.
 
 ### Feature view scene
 
@@ -1256,6 +1557,23 @@ FeatureView
 
 `Icon` is a billboarded `Sprite3D`.
 
+### Outdoor environment
+
+[`res://assets/environments/outdoor_environment.tres`](../assets/environments/outdoor_environment.tres)
+
+Reusable environment resource used by `WorldEnvironment`.
+
+It currently provides:
+
+- a procedural sky;
+- sky and horizon colors;
+- lower background colors;
+- ambient outdoor lighting.
+
+The resource can later be shared by other outdoor scenes.
+
+Clouds, weather, and time-dependent environment changes are not implemented.
+
 ### Terrain materials
 
 Directory:
@@ -1267,6 +1585,8 @@ Current materials:
 - `hex_body_material.tres`;
 - `clearing_surface_material.tres`;
 - `forest_surface_material.tres`.
+
+The body and terrain surface use separate materials.
 
 ### Feature visuals
 
@@ -1282,64 +1602,105 @@ Current resources:
 - `nice_spot_visual.tres`;
 - `watch_hill_visual.tres`.
 
-### Placeholder texture
+### Placeholder feature texture
 
 [`res://assets/textures/feature_placeholder.svg`](../assets/textures/feature_placeholder.svg)
 
 Temporary diamond-shaped texture shared by all current `FeatureVisual` resources.
 
+Feature types are currently distinguished by tint.
+
+### Exit icon
+
+[`res://assets/textures/ui/exit_icon.svg`](../assets/textures/ui/exit_icon.svg)
+
+Symmetrical cross icon used by the application exit button.
+
 ### Development seed
 
 [`res://config/world_seed.txt`](../config/world_seed.txt)
 
-Contains the seed used for ordinary editor test runs.
+Contains the seed used for ordinary editor startup runs.
 
 A command-line seed can override it.
+
+Runtime generation from the interface does not rewrite this file.
 
 ---
 
 ## Ownership and relationships
 
-The main relationships in 0.021p are:
+The main relationships in 0.022p are:
 
 1. The `Game` node owns the active [`World`](#world).
-2. `Game` receives generated tiles from `World`.
-3. `Game` passes those tiles to [`WorldView`](#worldview).
-4. `World` stores generated [`Tile`](#tile) instances.
-5. Each `Tile` owns exactly seven [`Sector`](#sector) instances.
-6. Each `Sector` may reference one [`Feature`](#feature).
-7. `WorldView` creates one [`HexView`](#hexview) for each displayed tile.
-8. `HexView` reads a tile’s type, coordinate, and sectors.
-9. `HexView` creates a [`FeatureView`](#featureview) for each occupied sector.
-10. `FeatureView` reads a feature’s `type_id`.
-11. `FeatureVisual` supplies replaceable presentation settings.
-12. No presentation class modifies or owns simulation state.
+2. [`WorldSeedProvider`](#worldseedprovider) supplies only the initial seed.
+3. [`GameInterface`](#gameinterface) emits user requests without modifying the world.
+4. `Game` validates runtime seed input and decides whether to replace the world.
+5. `Game` receives generated tiles from `World`.
+6. `Game` passes those tiles to [`WorldView`](#worldview).
+7. [`WorldDebugPrinter`](#worlddebugprinter) reads the same tiles for console output.
+8. `World` stores generated [`Tile`](#tile) instances.
+9. Each `Tile` owns exactly seven [`Sector`](#sector) instances.
+10. Each `Sector` may reference one [`Feature`](#feature).
+11. `WorldView` creates one [`HexView`](#hexview) for each displayed tile.
+12. `HexView` reads a tile’s type, coordinate, and sectors.
+13. `HexView` creates a [`FeatureView`](#featureview) for each occupied sector.
+14. `FeatureView` reads a feature’s `type_id`.
+15. [`FeatureVisual`](#featurevisual) supplies replaceable presentation settings.
+16. No interface or presentation class owns simulation state.
 
-The dependency direction is:
+The principal dependency direction is:
 
 ```text
 Game
+├── WorldSeedProvider
 ├── World
 │   └── Tile
 │       └── Sector
 │           └── Feature
-└── WorldView
-    └── HexView
-        └── FeatureView
-            └── FeatureVisual
+├── WorldView
+│   └── HexView
+│       └── FeatureView
+│           └── FeatureVisual
+├── GameInterface
+└── WorldDebugPrinter
 ```
 
-Simulation classes do not depend on presentation classes.
+Requests travel from the interface to the application layer:
+
+```text
+GameInterface
+    ├── world_generation_requested
+    └── exit_requested
+                │
+                ▼
+              Game
+```
+
+Generated simulation data travels toward presentation:
+
+```text
+World
+  │
+  ▼
+Game
+  │
+  ├──► WorldView
+  └──► WorldDebugPrinter
+```
+
+Simulation classes do not depend on interface or presentation classes.
 
 ## Current limitations
 
-At the end of 0.021p:
+At the end of 0.022p:
 
 - only the starting tile and its six neighbours are displayed;
 - other coordinates can be generated through `World.get_tile()`, but no exploration system requests them;
 - only `forest` and `clearing` terrain types exist;
-- terrain uses flat-color placeholder materials;
-- all features use one placeholder texture with different tints;
+- terrain uses simple placeholder materials;
+- all features use one diamond-shaped placeholder texture with different tints;
+- recognizable feature-specific images are not yet present;
 - empty sectors have no decorative visual variants;
 - undiscovered and hidden content is not implemented;
 - feature interaction is not implemented;
@@ -1347,8 +1708,15 @@ At the end of 0.021p:
 - localization keys exist, but translation resources are not present;
 - visibility and outlook values do not affect gameplay;
 - the camera is fixed and has no runtime movement or zoom controls;
-- the sky is represented by a static blue environment color;
-- the exit button planned for 0.03p is not implemented;
-- generated data is still printed to the debug console.
+- the current world always contains only the generated starting area;
+- generated worlds are not saved;
+- a seed entered through the interface is not persisted to `world_seed.txt`;
+- seed input accepts signed integer text but does not provide additional range controls;
+- generated data is still printed to the debug console;
+- the procedural environment has no clouds, weather, or animated time of day;
+- the directional sun is not synchronized through a shared world clock;
+- other planned gameplay layers, including sector exploration, combat, dialogue, and internal place spaces, are not implemented.
 
-Version 0.03p is intended to complete the first visualization milestone without adding movement, exploration interactions, or the broader game interface.
+The next visualization work is expected to replace the shared feature placeholder with recognizable feature-specific images and then add deterministic decorative variants to otherwise empty sectors.
+
+Version 0.03p remains the target for completing the first world-visualization milestone without adding player movement or interaction systems.
